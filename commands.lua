@@ -1,6 +1,4 @@
-if not Cursive.nampower then
-	return
-end
+-- Cursive commands setup for WotLK 3.3.5a
 
 local L = AceLibrary("AceLocale-2.2"):new("Cursive")
 local curseCommands = L["|cffffcc00Cursive:|cffffaaaa Commands:"]
@@ -99,18 +97,9 @@ end
 
 local function handleSlashCommands(msg, editbox)
 	if not msg or msg == "" then
-		DEFAULT_CHAT_FRAME:AddMessage(curseCommands)
-		for _, description in pairs(commands) do
-			DEFAULT_CHAT_FRAME:AddMessage(description)
-		end
-		DEFAULT_CHAT_FRAME:AddMessage(priorityChoices)
-		for priority, description in pairs(priorities) do
-			DEFAULT_CHAT_FRAME:AddMessage("|CFFFFFF00" .. priority .. "|R: " .. description)
-		end
-
-		DEFAULT_CHAT_FRAME:AddMessage(curseOptions)
-		for option, description in pairs(commandOptions) do
-			DEFAULT_CHAT_FRAME:AddMessage("|CFFFFFF00" .. option .. "|R: " .. description)
+		if Cursive.optionsFrame then
+			InterfaceOptionsFrame_OpenToCategory(Cursive.optionsFrame)
+			InterfaceOptionsFrame_OpenToCategory(Cursive.optionsFrame)
 		end
 		return
 	end
@@ -262,10 +251,14 @@ local spellImmuneGuids = {
 }
 
 local function isMobCrowdControlled(guid)
-	local auras = GetUnitField(guid, "aura") or {}
-	for i, spellId in pairs(auras) do
-		if crowdControlledSpellIds[spellId] then
-			return true
+	local token = Cursive.core:GetTokenForGUID(guid)
+	if token then
+		for i = 1, 40 do
+			local name, _, _, _, _, _, _, _, _, _, spellId = UnitDebuff(token, i)
+			if not name then break end
+			if crowdControlledSpellIds[spellId] then
+				return true
+			end
 		end
 	end
 	return false
@@ -276,7 +269,8 @@ local function isMobSpellImmune(guid)
 end
 
 local function GetSquarePrioRaidTargetIndex(guid)
-	local index = GetRaidTargetIndex(guid)
+	local token = Cursive.core:GetTokenForGUID(guid)
+	local index = token and GetRaidTargetIndex(token) or 0
 	if index == 7 then
 		return 0 -- cross becomes 0
 	elseif index == 8 then
@@ -288,43 +282,45 @@ local function GetSquarePrioRaidTargetIndex(guid)
 end
 
 local function hasSpellId(guid, ignoreSpellId)
-	local auras = GetUnitField(guid, "aura")
-	for i, spellId in pairs(auras) do
-		if spellId == ignoreSpellId then
-			return true
+	local token = Cursive.core:GetTokenForGUID(guid)
+	if token then
+		for i = 1, 40 do
+			local name, _, _, _, _, _, _, _, _, _, spellId = UnitDebuff(token, i)
+			if not name then break end
+			if spellId == ignoreSpellId then
+				return true
+			end
 		end
 	end
 	return false
 end
 
 local function hasSpellTexture(guid, ignoreTexture)
-	for i = 1, 16 do
-		local texture = UnitDebuff(guid, i);
-		if not texture then
-			break
+	local token = Cursive.core:GetTokenForGUID(guid)
+	if token then
+		for i = 1, 40 do
+			local name, _, texture = UnitDebuff(token, i)
+			if not name then break end
+			if texture and string.find(string.lower(texture), string.lower(ignoreTexture)) then
+				return true
+			end
 		end
-		if string.find(texture, ignoreTexture) then
-			return true
-		end
-	end
-
-	for i = 1, 32 do
-		local texture = UnitBuff(guid, i);
-		if not texture then
-			break
-		end
-		if string.find(texture, ignoreTexture) then
-			return true
+		for i = 1, 40 do
+			local name, _, texture = UnitBuff(token, i)
+			if not name then break end
+			if texture and string.find(string.lower(texture), string.lower(ignoreTexture)) then
+				return true
+			end
 		end
 	end
-
 	return false
 end
 
 local function passedOptionFilters(guid, options)
+	local token = Cursive.core:GetTokenForGUID(guid)
 	if options["name"] then
-		local name = UnitName(guid)
-		if not string.find(name, options["name"]) then
+		local name = token and UnitName(token) or (Cursive.core.cache[guid] and Cursive.core.cache[guid].name)
+		if not name or not string.find(name, options["name"]) then
 			return false
 		end
 	end
@@ -338,104 +334,108 @@ local function passedOptionFilters(guid, options)
 			return false
 		end
 	end
-	if options["playeronly"] and not UnitIsPlayer(guid) then
-		return false
+	if options["playeronly"] then
+		local isPlayer = token and UnitIsPlayer(token) or (Cursive.core.cache[guid] and Cursive.core.cache[guid].isPlayer)
+		if not isPlayer then return false end
 	end
-	if options["istapped"] and not UnitIsTapped(guid) then
-		return false
+	if options["istapped"] then
+		local isTapped = token and UnitIsTapped(token) or (Cursive.core.cache[guid] and Cursive.core.cache[guid].isTapped)
+		if not isTapped then return false end
 	end
 	return true
 end
 
 local function pickTarget(selectedPriority, lowercaseSpellNameNoRank, checkRange, options)
-	-- Curse the target that best matches the selected priority
 	local highestPrimaryValue = -10
 	local highestSecondaryValue = -10
 	local targetedGuid = nil
 
 	if selectedPriority == PRIORITY_LOWEST_HP then
-		highestPrimaryValue = 999999999999 -- should be bigger than any mob hp
+		highestPrimaryValue = 999999999999
 	end
 
 	local minHp = options["minhp"]
 	local ignoreInFight = options["allowooc"]
 	local refreshTime = options["refreshtime"]
 
-	local _, currentTargetGuid = UnitExists("target")
-
-	local seenRaidMark = nil -- if we have seen a raid mark
+	local currentTargetGuid = UnitGUID("target")
+	local seenRaidMark = nil
 
 	for guid, time in pairs(Cursive.core.guids) do
-		-- apply filters
 		local shouldDisplay = Cursive:ShouldDisplayGuid(guid)
-		-- check if target displayed
 		if shouldDisplay then
 			if not options["ignoretarget"] or guid ~= currentTargetGuid then
-				-- check if in combat already or player is actively targeting the mob
 				if ignoreInFight or Cursive.filter.infight(guid) or guid == currentTargetGuid then
 					if passedOptionFilters(guid, options) then
 						local passedRangeCheck = false
-						if IsSpellInRange then
-							local result
-							if Cursive.curses.isDruid and string.find(lowercaseSpellNameNoRank, "faerie fire %(feral%)") then
-								-- IsSpellInRange doesn't work with Faerie Fire (Feral), use spellid instead
-								result = IsSpellInRange(17392, guid)
+						local token = Cursive.core:GetTokenForGUID(guid)
+						if token then
+							if IsSpellInRange then
+								local result = IsSpellInRange(lowercaseSpellNameNoRank, token)
+								if result == -1 then
+									passedRangeCheck = checkRange == false or CheckInteractDistance(token, 4)
+								else
+									passedRangeCheck = result == 1
+								end
 							else
-								result = IsSpellInRange(lowercaseSpellNameNoRank, guid)
-							end
-							if result == -1 then
-								passedRangeCheck = checkRange == false or CheckInteractDistance(guid, 4) -- fallback to old range check
-							else
-								-- 0 or 1
-								passedRangeCheck = result == 1
+								passedRangeCheck = checkRange == false or CheckInteractDistance(token, 4)
 							end
 						else
-							-- prioritize targets within 28 yards first to improve chances of being in range
-							passedRangeCheck = checkRange == false or CheckInteractDistance(guid, 4)
+							passedRangeCheck = (checkRange == false)
 						end
+
 						if passedRangeCheck then
-							-- check if the target has the curse
-              if not Cursive.curses:HasCurse(lowercaseSpellNameNoRank, guid, refreshTime, options["malediction"]) and
-                  not isMobCrowdControlled(guid) and
-                  not isMobSpellImmune(guid) then
-								local mobHp = UnitHealth(guid)
+							if not Cursive.curses:HasCurse(lowercaseSpellNameNoRank, guid, refreshTime, options["malediction"]) and
+									not isMobCrowdControlled(guid) and
+									not isMobSpellImmune(guid) then
+								
+								local token = Cursive.core:GetTokenForGUID(guid)
+								local mobHp = token and UnitHealth(token) or (Cursive.core.cache[guid] and Cursive.core.cache[guid].maxHp or 0)
+								
 								if not minHp or mobHp >= minHp then
 									local primaryValue = -1
 									local secondaryValue = -1
 									if options["priotarget"] and guid == currentTargetGuid then
 										seenRaidMark = true
-										primaryValue = 999999999999 -- should be bigger than any mob hp
+										primaryValue = 999999999999
 									elseif selectedPriority == PRIORITY_HIGHEST_HP then
-										primaryValue = UnitHealth(guid) or 0
+										local t = Cursive.core:GetTokenForGUID(guid)
+										primaryValue = t and UnitHealth(t) or (Cursive.core.cache[guid] and Cursive.core.cache[guid].maxHp or 0)
 									elseif selectedPriority == PRIORITY_LOWEST_HP then
-										primaryValue = UnitHealth(guid) or 999999999999
+										local t = Cursive.core:GetTokenForGUID(guid)
+										primaryValue = t and UnitHealth(t) or (Cursive.core.cache[guid] and Cursive.core.cache[guid].maxHp or 999999999999)
 									elseif selectedPriority == PRIORITY_RAID_MARK then
-										primaryValue = GetRaidTargetIndex(guid) or 0
+										local t = Cursive.core:GetTokenForGUID(guid)
+										primaryValue = t and GetRaidTargetIndex(t) or 0
 									elseif selectedPriority == PRIORITY_RAID_MARK_SQUARE then
 										primaryValue = GetSquarePrioRaidTargetIndex(guid)
 									elseif selectedPriority == PRIORITY_INVERSE_RAID_MARK then
-										primaryValue = -1 * (GetRaidTargetIndex(guid) or 9)
+										local t = Cursive.core:GetTokenForGUID(guid)
+										primaryValue = -1 * (t and GetRaidTargetIndex(t) or 9)
 									elseif selectedPriority == PRIORITY_HIGHEST_HP_RAID_MARK then
-										secondaryValue = GetRaidTargetIndex(guid) or 0
+										local t = Cursive.core:GetTokenForGUID(guid)
+										secondaryValue = t and GetRaidTargetIndex(t) or 0
 										if secondaryValue > 0 and not seenRaidMark then
-											highestPrimaryValue = -10 -- reset highestPriorityValue if this is the first raid mark we've seen
+											highestPrimaryValue = -10
 											seenRaidMark = true
 										end
-										primaryValue = UnitHealth(guid) or 0
+										primaryValue = t and UnitHealth(t) or (Cursive.core.cache[guid] and Cursive.core.cache[guid].maxHp or 0)
 									elseif selectedPriority == PRIORITY_HIGHEST_HP_RAID_MARK_SQUARE then
 										secondaryValue = GetSquarePrioRaidTargetIndex(guid)
 										if secondaryValue > -2 and not seenRaidMark then
-											highestPrimaryValue = -10 -- reset highestPriorityValue if this is the first raid mark we've seen
+											highestPrimaryValue = -10
 											seenRaidMark = true
 										end
-										primaryValue = UnitHealth(guid) or 0
+										local t = Cursive.core:GetTokenForGUID(guid)
+										primaryValue = t and UnitHealth(t) or (Cursive.core.cache[guid] and Cursive.core.cache[guid].maxHp or 0)
 									elseif selectedPriority == PRIORITY_HIGHEST_HP_INVERSE_RAID_MARK then
-										secondaryValue = -1 * (GetRaidTargetIndex(guid) or 9)
+										local t = Cursive.core:GetTokenForGUID(guid)
+										secondaryValue = -1 * (t and GetRaidTargetIndex(t) or 9)
 										if secondaryValue > -9 and not seenRaidMark then
-											highestPrimaryValue = -10 -- reset highestPriorityValue if this is the first raid mark we've seen
+											highestPrimaryValue = -10
 											seenRaidMark = true
 										end
-										primaryValue = UnitHealth(guid) or 0
+										primaryValue = t and UnitHealth(t) or (Cursive.core.cache[guid] and Cursive.core.cache[guid].maxHp or 0)
 									end
 
 									if selectedPriority == PRIORITY_LOWEST_HP then
@@ -460,64 +460,15 @@ local function pickTarget(selectedPriority, lowercaseSpellNameNoRank, checkRange
 		end
 	end
 
-	-- run again if no target found ignoring range (only if IsSpellInRange is not available)
-	if not targetedGuid and checkRange == true and not IsSpellInRange then
-		targetedGuid = pickTarget(selectedPriority, lowercaseSpellNameNoRank, false, options)
-	end
-
 	return targetedGuid
 end
 
 local function castSpellWithOptions(spellName, lowercaseSpellNameNoRank, targetedGuid, options)
-	if options["resistsound"] then
-		Cursive.curses:EnableResistSound(targetedGuid)
-	end
-	if options["expiringsound"] then
-		Cursive.curses:RequestExpiringSound(lowercaseSpellNameNoRank, targetedGuid)
-	end
-	CastSpellByName(spellName, targetedGuid)
+	-- Protected action, warning printed in callers
 end
 
 function Cursive:Curse(spellName, targetedGuid, options)
-	if not spellName or not targetedGuid then
-		DEFAULT_CHAT_FRAME:AddMessage(commands["curse"])
-		return false
-	end
-
-	if targetedGuid and string.sub(targetedGuid, 1, 2) ~= "0x" then
-		_, targetedGuid = UnitExists(targetedGuid)
-
-		if not targetedGuid then
-			if options["warnings"] then
-				DEFAULT_CHAT_FRAME:AddMessage(curseNoTarget)
-			end
-			return false
-		end
-	end
-
-	if targetedGuid then
-		-- check for options
-		if not passedOptionFilters(targetedGuid, options) then
-			if options["warnings"] then
-				DEFAULT_CHAT_FRAME:AddMessage(curseNoTarget)
-			end
-			return false
-		end
-	end
-
-	-- remove (Rank x) from spellName if it exists
-	local lowercaseSpellNameNoRank = Cursive.utils.GetLowercaseSpellNameNoRank(spellName)
-
-	if targetedGuid and
-			not Cursive.curses:HasCurse(lowercaseSpellNameNoRank, targetedGuid, options["refreshtime"], options["malediction"]) and
-			not isMobCrowdControlled(targetedGuid) and
-			not isMobSpellImmune(targetedGuid) then
-		castSpellWithOptions(string.lower(spellName), lowercaseSpellNameNoRank, targetedGuid, options)
-		return true
-	elseif options["warnings"] then
-		DEFAULT_CHAT_FRAME:AddMessage(curseNoTarget)
-	end
-
+	DEFAULT_CHAT_FRAME:AddMessage(L["|cffffcc00Cursive:|cffffaaaa Spell casting via slash commands is disabled in WotLK. Please use mouseover macros."])
 	return false
 end
 
@@ -536,22 +487,13 @@ local function getSpellTarget(spellName, priority, options)
 	end
 
 	local selectedPriority = priority or PRIORITY_HIGHEST_HP
-
-	-- remove (Rank x) from spellName if it exists
 	local lowercaseSpellNameNoRank = Cursive.utils.GetLowercaseSpellNameNoRank(spellName)
 
 	return pickTarget(selectedPriority, lowercaseSpellNameNoRank, true, options)
 end
 
 function Cursive:Multicurse(spellName, priority, options)
-	local targetedGuid = getSpellTarget(spellName, priority, options)
-	if targetedGuid then
-		local lowercaseSpellNameNoRank = Cursive.utils.GetLowercaseSpellNameNoRank(spellName)
-		castSpellWithOptions(string.lower(spellName), lowercaseSpellNameNoRank, targetedGuid, options)
-		return true
-	elseif options["warnings"] then
-		DEFAULT_CHAT_FRAME:AddMessage(curseNoTarget)
-	end
+	DEFAULT_CHAT_FRAME:AddMessage(L["|cffffcc00Cursive:|cffffaaaa Spell casting via slash commands is disabled in WotLK. Please use mouseover macros."])
 	return false
 end
 
@@ -560,10 +502,24 @@ function Cursive:GetTarget(spellName, priority, options)
 end
 
 function Cursive:Target(spellName, priority, options)
+	if InCombatLockdown() then
+		DEFAULT_CHAT_FRAME:AddMessage(L["|cffffcc00Cursive:|cffffaaaa Targeting via slash commands is disabled in combat."])
+		return false
+	end
+
 	local targetedGuid = getSpellTarget(spellName, priority, options)
 	if targetedGuid then
-		TargetUnit(targetedGuid)
-		return true
+		local token = Cursive.core:GetTokenForGUID(targetedGuid)
+		if token then
+			TargetUnit(token)
+			return true
+		else
+			local cached = Cursive.core.cache[targetedGuid]
+			if cached and cached.name then
+				Cursive.utils.TargetByName(cached.name)
+				return true
+			end
+		end
 	end
 	return false
 end

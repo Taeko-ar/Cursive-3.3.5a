@@ -1,6 +1,4 @@
-if not Cursive.nampower then
-	return
-end
+-- Cursive utils setup for WotLK 3.3.5a
 
 local utils = {}
 
@@ -148,7 +146,7 @@ utils.rgbhex = function(r, g, b, a)
 end
 
 utils.GetReactionColor = function(unitstr)
-	local color = UnitReactionColor[UnitReaction(unitstr, "player")]
+	local color = FACTION_BAR_COLORS[UnitReaction(unitstr, "player")]
 	local r, g, b = .8, .8, .8
 
 	if color then
@@ -207,6 +205,21 @@ end
 
 utils.GetLowercaseSpellNameNoRank = function(spellName)
 	return string.lower(string.gsub(spellName, "%([rR]ank %d%)", ""))
+end
+
+utils.TargetByName = function(name)
+	if not name then return end
+	local editBox = ChatFrame1EditBox or ChatFrameEditBox
+	if editBox then
+		local active = editBox:IsShown()
+		local text = editBox:GetText()
+		editBox:SetText("/target " .. name)
+		ChatEdit_SendText(editBox)
+		if active then
+			editBox:Show()
+			editBox:SetText(text)
+		end
+	end
 end
 
 Cursive.utils = utils

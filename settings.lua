@@ -1,63 +1,64 @@
-if not Cursive.nampower then
-	return
-end
-
 local L = AceLibrary("AceLocale-2.2"):new("Cursive")
-Cursive:RegisterDB("CursiveDB")
-Cursive:RegisterDefaults("profile", {
-	caption = L["Cursive"],
-	anchor = "CENTER",
-	x = -240,
-	y = 120,
 
-	-- editable
-	enabled = true,
-	clickthrough = false,
-	showbackdrop = false,
-	showtitle = true,
-	showtargetindicator = true,
-	showraidicons = true,
-	showhealthbar = true,
-	showunitname = true,
+Cursive.defaults = {
+	profile = {
+		caption = L["Cursive"],
+		anchor = "CENTER",
+		x = -240,
+		y = 120,
 
-	malediction = true,
+		-- editable
+		enabled = true,
+		clickthrough = false,
+		showbackdrop = false,
+		showtitle = true,
+		showtargetindicator = true,
+		showraidicons = true,
+		showhealthbar = true,
+		showunitname = true,
 
-	shareddebuffs = {
-		faeriefire = false,
-	},
+		malediction = true,
 
-	alwaysshowcurrenttarget = true,
+		shareddebuffs = {
+			faeriefire = false,
+		},
 
-	scale = 1,
-	healthwidth = 100,
-	height = 16,
-	bartexture = "Interface\\TargetingFrame\\UI-StatusBar",
+		alwaysshowcurrenttarget = true,
 
-	raidiconsize = 16,
-	curseiconsize = 16,
-	maxcurses = 5,
-	spacing = 4,
-	maxrow = 10,
-	maxcol = 1,
-	textsize = 9,
-	cursetimersize = 11,
+		scale = 1,
+		healthwidth = 100,
+		height = 16,
+		bartexture = "Interface\\TargetingFrame\\UI-StatusBar",
 
-	curseordering = L["Expiring soonest -> latest"],
-	curseshowdecimals = false,
-	invertbars = false,
-	expandupwards = false,
+		raidiconsize = 16,
+		curseiconsize = 16,
+		maxcurses = 5,
+		spacing = 4,
+		maxrow = 10,
+		maxcol = 1,
+		textsize = 9,
+		cursetimersize = 11,
 
-	filterincombat = true,
-	filterhostile = true,
-	filterattackable = true,
-	filterrange = false,
-	filterraidmark = false,
-	filterhascurse = false,
-	filterignored = true,
+		curseordering = L["Expiring soonest -> latest"],
+		curseshowdecimals = false,
+		invertbars = false,
+		expandupwards = false,
 
-	ignorelist = {},
-	ignorelistuseregex = false,
-})
+		filterincombat = true,
+		filterhostile = true,
+		filterattackable = true,
+		filterrange = false,
+		filterraidmark = false,
+		filterhascurse = false,
+		filterignored = true,
+
+		ignorelist = {},
+		ignorelistuseregex = false,
+
+		showMinimapButton = true,
+		minimapAngle = 180,
+	}
+}
 
 local function splitIgnoreString(str, delimiter)
 	local result = {}
@@ -87,7 +88,7 @@ local barOptions = {
 		get = function()
 			return Cursive.db.profile.invertbars
 		end,
-		set = function(v)
+		set = function(_, v)
 			Cursive.db.profile.invertbars = v
 			Cursive.UpdateFramesFromConfig()
 		end,
@@ -100,7 +101,7 @@ local barOptions = {
 		get = function()
 			return Cursive.db.profile.expandupwards
 		end,
-		set = function(v)
+		set = function(_, v)
 			Cursive.db.profile.expandupwards = v
 			Cursive.UpdateFramesFromConfig()
 		end,
@@ -118,7 +119,7 @@ local barOptions = {
 		get = function()
 			return Cursive.db.profile.showtargetindicator
 		end,
-		set = function(v)
+		set = function(_, v)
 			Cursive.db.profile.showtargetindicator = v
 			Cursive.UpdateFramesFromConfig()
 		end,
@@ -131,7 +132,7 @@ local barOptions = {
 		get = function()
 			return Cursive.db.profile.showraidicons
 		end,
-		set = function(v)
+		set = function(_, v)
 			Cursive.db.profile.showraidicons = v
 			Cursive.UpdateFramesFromConfig()
 		end,
@@ -144,7 +145,7 @@ local barOptions = {
 		get = function()
 			return Cursive.db.profile.showhealthbar
 		end,
-		set = function(v)
+		set = function(_, v)
 			Cursive.db.profile.showhealthbar = v
 			Cursive.UpdateFramesFromConfig()
 		end,
@@ -157,7 +158,7 @@ local barOptions = {
 		get = function()
 			return Cursive.db.profile.showunitname
 		end,
-		set = function(v)
+		set = function(_, v)
 			Cursive.db.profile.showunitname = v
 			Cursive.UpdateFramesFromConfig()
 		end,
@@ -170,7 +171,7 @@ local barOptions = {
 		get = function()
 			return Cursive.db.profile.alwaysshowcurrenttarget
 		end,
-		set = function(v)
+		set = function(_, v)
 			Cursive.db.profile.alwaysshowcurrenttarget = v
 		end,
 	},
@@ -190,7 +191,7 @@ local barOptions = {
 		get = function()
 			return Cursive.db.profile.healthwidth
 		end,
-		set = function(v)
+		set = function(_, v)
 			if v ~= Cursive.db.profile.healthwidth then
 				Cursive.db.profile.healthwidth = v
 				Cursive.UpdateFramesFromConfig()
@@ -208,7 +209,7 @@ local barOptions = {
 		get = function()
 			return Cursive.db.profile.height
 		end,
-		set = function(v)
+		set = function(_, v)
 			if v ~= Cursive.db.profile.height then
 				Cursive.db.profile.height = v
 				Cursive.UpdateFramesFromConfig()
@@ -216,15 +217,14 @@ local barOptions = {
 		end,
 	},
 	["bartexture"] = {
-		type = "text",
+		type = "input",
 		name = L["Health Bar Texture"],
 		desc = L["Health Bar Texture Desc"],
 		order = 55,
-		usage = "Interface\\TargetingFrame\\UI-StatusBar",
 		get = function()
 			return Cursive.db.profile.bartexture
 		end,
-		set = function(v)
+		set = function(_, v)
 			if v ~= Cursive.db.profile.bartexture then
 				Cursive.db.profile.bartexture = v
 				Cursive.UpdateFramesFromConfig()
@@ -242,7 +242,7 @@ local barOptions = {
 		get = function()
 			return Cursive.db.profile.raidiconsize
 		end,
-		set = function(v)
+		set = function(_, v)
 			if v ~= Cursive.db.profile.raidiconsize then
 				Cursive.db.profile.raidiconsize = v
 				Cursive.UpdateFramesFromConfig()
@@ -260,7 +260,7 @@ local barOptions = {
 		get = function()
 			return Cursive.db.profile.curseiconsize
 		end,
-		set = function(v)
+		set = function(_, v)
 			if v ~= Cursive.db.profile.curseiconsize then
 				Cursive.db.profile.curseiconsize = v
 				Cursive.UpdateFramesFromConfig()
@@ -268,15 +268,15 @@ local barOptions = {
 		end,
 	},
 	["curseordering"] = {
-		type = "text",
+		type = "select",
 		name = L["Curse Ordering"],
 		desc = L["Curse Ordering"],
 		order = 72,
 		get = function()
 			return Cursive.db.profile.curseordering
 		end,
-		validate = { L["Order applied"], L["Expiring soonest -> latest"], L["Expiring latest -> soonest"] },
-		set = function(v)
+		values = { [L["Order applied"]] = L["Order applied"], [L["Expiring soonest -> latest"]] = L["Expiring soonest -> latest"], [L["Expiring latest -> soonest"]] = L["Expiring latest -> soonest"] },
+		set = function(_, v)
 			Cursive.db.profile.curseordering = v
 		end,
 	},
@@ -288,7 +288,7 @@ local barOptions = {
 		get = function()
 			return Cursive.db.profile.curseshowdecimals
 		end,
-		set = function(v)
+		set = function(_, v)
 			Cursive.db.profile.curseshowdecimals = v
 			Cursive.UpdateFramesFromConfig()
 		end,
@@ -304,7 +304,7 @@ local barOptions = {
 		get = function()
 			return Cursive.db.profile.spacing
 		end,
-		set = function(v)
+		set = function(_, v)
 			if v ~= Cursive.db.profile.spacing then
 				Cursive.db.profile.spacing = v
 				Cursive.UpdateFramesFromConfig()
@@ -322,7 +322,7 @@ local barOptions = {
 		get = function()
 			return Cursive.db.profile.textsize
 		end,
-		set = function(v)
+		set = function(_, v)
 			if v ~= Cursive.db.profile.textsize then
 				Cursive.db.profile.textsize = v
 				Cursive.UpdateFramesFromConfig()
@@ -340,7 +340,7 @@ local barOptions = {
 		get = function()
 			return Cursive.db.profile.cursetimersize
 		end,
-		set = function(v)
+		set = function(_, v)
 			if v ~= Cursive.db.profile.cursetimersize then
 				Cursive.db.profile.cursetimersize = v
 				Cursive.UpdateFramesFromConfig()
@@ -358,7 +358,7 @@ local barOptions = {
 		get = function()
 			return Cursive.db.profile.scale
 		end,
-		set = function(v)
+		set = function(_, v)
 			if v ~= Cursive.db.profile.scale then
 				Cursive.db.profile.scale = v
 				Cursive.UpdateFramesFromConfig()
@@ -376,7 +376,7 @@ local mobFilters = {
 		get = function()
 			return Cursive.db.profile.filterincombat
 		end,
-		set = function(v)
+		set = function(_, v)
 			Cursive.db.profile.filterincombat = v
 		end,
 	},
@@ -388,7 +388,7 @@ local mobFilters = {
 		get = function()
 			return Cursive.db.profile.filterhostile
 		end,
-		set = function(v)
+		set = function(_, v)
 			Cursive.db.profile.filterhostile = v
 		end,
 	},
@@ -400,7 +400,7 @@ local mobFilters = {
 		get = function()
 			return Cursive.db.profile.filterattackable
 		end,
-		set = function(v)
+		set = function(_, v)
 			Cursive.db.profile.filterattackable = v
 		end,
 	},
@@ -412,7 +412,7 @@ local mobFilters = {
 		get = function()
 			return Cursive.db.profile.filterplayer
 		end,
-		set = function(v)
+		set = function(_, v)
 			Cursive.db.profile.filterplayer = v
 		end,
 	},
@@ -424,19 +424,19 @@ local mobFilters = {
 		get = function()
 			return Cursive.db.profile.filternotplayer
 		end,
-		set = function(v)
+		set = function(_, v)
 			Cursive.db.profile.filternotplayer = v
 		end,
 	},
 	["range"] = {
 		type = "toggle",
-		name = IsSpellInRange and L["Within 45 Range"] or L["Within 28 Range"],
-		desc = IsSpellInRange and L["Within 45 Range"] or L["Within 28 Range"],
+		name = L["Within Range Check"],
+		desc = L["Within Range Check"],
 		order = 44,
 		get = function()
 			return Cursive.db.profile.filterrange
 		end,
-		set = function(v)
+		set = function(_, v)
 			Cursive.db.profile.filterrange = v
 		end,
 	},
@@ -448,7 +448,7 @@ local mobFilters = {
 		get = function()
 			return Cursive.db.profile.filterraidmark
 		end,
-		set = function(v)
+		set = function(_, v)
 			Cursive.db.profile.filterraidmark = v
 		end,
 	},
@@ -460,7 +460,7 @@ local mobFilters = {
 		get = function()
 			return Cursive.db.profile.filterhascurse
 		end,
-		set = function(v)
+		set = function(_, v)
 			Cursive.db.profile.filterhascurse = v
 		end,
 	},
@@ -472,29 +472,27 @@ local mobFilters = {
 		get = function()
 			return Cursive.db.profile.filterignored
 		end,
-		set = function(v)
+		set = function(_, v)
 			Cursive.db.profile.filterignored = v
 		end,
 	},
 	["ignorelist"] = {
-		type = "text",
+		type = "input",
 		name = L["Ignored Mobs List (Enter to save)"],
 		desc = L["Ignored Mobs Desc"],
-		usage = "whelp, black dragonkin, player3",
 		order = 68,
 		get = function()
-			if Cursive.db.profile.ignorelist and table.getn(Cursive.db.profile.ignorelist) > 0 then
+			if Cursive.db.profile.ignorelist and #Cursive.db.profile.ignorelist > 0 then
 				return table.concat(Cursive.db.profile.ignorelist, ",") or ""
 			end
 			return ""
 		end,
-		set = function(v)
+		set = function(_, v)
 			if not v or v == "" then
 				Cursive.db.profile.ignorelist = {}
 			else
 				Cursive.db.profile.ignorelist = splitIgnoreString(v, ",");
 			end
-			-- check for common lua regex patterns
 			Cursive.db.profile.ignorelistuseregex = string.find(v, "[*+%%?]") ~= nil
 		end,
 	},
@@ -509,7 +507,7 @@ local sharedDebuffs = {
 		get = function()
 			return Cursive.db.profile.shareddebuffs.faeriefire
 		end,
-		set = function(v)
+		set = function(_, v)
 			Cursive.db.profile.shareddebuffs.faeriefire = v
 			Cursive.UpdateFramesFromConfig()
 		end,
@@ -518,6 +516,7 @@ local sharedDebuffs = {
 
 Cursive.cmdtable = {
 	type = "group",
+	name = L["Cursive"],
 	handler = Cursive,
 	args = {
 		["enabled"] = {
@@ -528,7 +527,7 @@ Cursive.cmdtable = {
 			get = function()
 				return Cursive.db.profile.enabled
 			end,
-			set = function(v)
+			set = function(_, v)
 				Cursive.db.profile.enabled = v
 				if v == true then
 					Cursive.core.enable()
@@ -545,7 +544,7 @@ Cursive.cmdtable = {
 			get = function()
 				return Cursive.db.profile.showtitle
 			end,
-			set = function(v)
+			set = function(_, v)
 				Cursive.db.profile.showtitle = v
 				Cursive.UpdateFramesFromConfig()
 			end,
@@ -558,7 +557,7 @@ Cursive.cmdtable = {
 			get = function()
 				return Cursive.db.profile.clickthrough
 			end,
-			set = function(v)
+			set = function(_, v)
 				Cursive.db.profile.clickthrough = v
 				Cursive.UpdateFramesFromConfig()
 			end,
@@ -571,9 +570,24 @@ Cursive.cmdtable = {
 			get = function()
 				return Cursive.db.profile.showbackdrop
 			end,
-			set = function(v)
+			set = function(_, v)
 				Cursive.db.profile.showbackdrop = v
 				Cursive.UpdateFramesFromConfig()
+			end,
+		},
+		["showMinimapButton"] = {
+			type = "toggle",
+			name = "Show Minimap Button",
+			desc = "Toggle showing the Cursive button on the minimap",
+			order = 8,
+			get = function()
+				return Cursive.db.profile.showMinimapButton ~= false
+			end,
+			set = function(_, v)
+				Cursive.db.profile.showMinimapButton = v
+				if Cursive.minimapButton then
+					if v then Cursive.minimapButton:Show() else Cursive.minimapButton:Hide() end
+				end
 			end,
 		},
 		["resetframe"] = {
@@ -587,11 +601,6 @@ Cursive.cmdtable = {
 				Cursive.db.profile.y = -100
 				Cursive.UpdateFramesFromConfig()
 			end,
-		},
-		["spacer"] = {
-			type = "header",
-			name = " ",
-			order = 11,
 		},
 		["bardisplay"] = {
 			type = "group",
@@ -614,11 +623,6 @@ Cursive.cmdtable = {
 			order = 20,
 			args = sharedDebuffs
 		},
-		["spacer2"] = {
-			type = "header",
-			name = " ",
-			order = 21,
-		},
 		["maxcurses"] = {
 			type = "range",
 			name = L["Max Curses"],
@@ -630,7 +634,7 @@ Cursive.cmdtable = {
 			get = function()
 				return Cursive.db.profile.maxcurses
 			end,
-			set = function(v)
+			set = function(_, v)
 				if v ~= Cursive.db.profile.maxcurses then
 					Cursive.db.profile.maxcurses = v
 					Cursive.UpdateFramesFromConfig()
@@ -648,7 +652,7 @@ Cursive.cmdtable = {
 			get = function()
 				return Cursive.db.profile.maxrow
 			end,
-			set = function(v)
+			set = function(_, v)
 				if v ~= Cursive.db.profile.maxrow then
 					Cursive.db.profile.maxrow = v
 					Cursive.UpdateFramesFromConfig()
@@ -666,7 +670,7 @@ Cursive.cmdtable = {
 			get = function()
 				return Cursive.db.profile.maxcol
 			end,
-			set = function(v)
+			set = function(_, v)
 				if v ~= Cursive.db.profile.maxcol then
 					Cursive.db.profile.maxcol = v
 					Cursive.UpdateFramesFromConfig()
@@ -676,24 +680,92 @@ Cursive.cmdtable = {
 	}
 }
 
-local deuce = Cursive:NewModule("Options Menu")
-deuce.hasFuBar = IsAddOnLoaded("FuBar") and FuBar
-deuce.consoleCmd = not deuce.hasFuBar
-
-CursiveOptions = AceLibrary("AceAddon-2.0"):new("AceDB-2.0", "FuBarPlugin-2.0")
-CursiveOptions.name = "FuBar - Cursive"
-CursiveOptions:RegisterDB("CursiveDB")
-CursiveOptions.hasIcon = "Interface\\Icons\\spell_shadow_deathcoil"
-CursiveOptions.defaultMinimapPosition = 180
-CursiveOptions.independentProfile = true
-CursiveOptions.hideWithoutStandby = false
-
--- XXX total hack
-CursiveOptions.OnMenuRequest = Cursive.cmdtable
-local args = AceLibrary("FuBarPlugin-2.0"):GetAceOptionsDataTable(CursiveOptions)
-for k, v in pairs(args) do
-	if CursiveOptions.OnMenuRequest.args[k] == nil then
-		CursiveOptions.OnMenuRequest.args[k] = v
+-- Custom self-contained minimap button for Cursive
+local function CreateMinimapButton()
+	local CursiveMinimapButton = CreateFrame("Button", "CursiveMinimapButton", Minimap)
+	CursiveMinimapButton:SetSize(31, 31)
+	CursiveMinimapButton:SetFrameLevel(8)
+	CursiveMinimapButton:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
+	
+	local icon = CursiveMinimapButton:CreateTexture(nil, "BACKGROUND")
+	icon:SetSize(20, 20)
+	icon:SetTexture("Interface\\Icons\\spell_shadow_deathcoil")
+	icon:SetPoint("CENTER", 0, 0)
+	
+	local border = CursiveMinimapButton:CreateTexture(nil, "OVERLAY")
+	border:SetSize(53, 53)
+	border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+	border:SetPoint("TOPLEFT", 0, 0)
+	
+	local function UpdatePosition()
+		local angle = Cursive.db.profile.minimapAngle or 180
+		local x = math.cos(math.rad(angle)) * 80
+		local y = math.sin(math.rad(angle)) * 80
+		CursiveMinimapButton:SetPoint("CENTER", Minimap, "CENTER", x, y)
 	end
+	
+	CursiveMinimapButton:RegisterForDrag("LeftButton")
+	CursiveMinimapButton:SetMovable(true)
+	
+	CursiveMinimapButton:SetScript("OnDragStart", function(self)
+		self:StartMoving()
+		self:SetScript("OnUpdate", function(self)
+			local xpos, ypos = GetCursorPosition()
+			local xmin, ymin = Minimap:GetLeft(), Minimap:GetBottom()
+			xpos = xpos / Minimap:GetEffectiveScale() - xmin - 70
+			ypos = ypos / Minimap:GetEffectiveScale() - ymin - 70
+			local angle = math.deg(math.atan2(ypos, xpos))
+			if angle < 0 then angle = angle + 360 end
+			Cursive.db.profile.minimapAngle = angle
+			UpdatePosition()
+		end)
+	end)
+	
+	CursiveMinimapButton:SetScript("OnDragStop", function(self)
+		self:StopMovingOrSizing()
+		self:SetScript("OnUpdate", nil)
+	end)
+	
+	CursiveMinimapButton:SetScript("OnClick", function(self, button)
+		if button == "LeftButton" then
+			InterfaceOptionsFrame_OpenToCategory(Cursive.optionsFrame)
+			InterfaceOptionsFrame_OpenToCategory(Cursive.optionsFrame)
+		end
+	end)
+	
+	CursiveMinimapButton:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+		GameTooltip:ClearLines()
+		GameTooltip:AddLine("Cursive")
+		GameTooltip:AddLine("|cffFFFFFFLeft-Click|r to open settings", 0.2, 1, 0.2)
+		GameTooltip:AddLine("|cffFFFFFFDrag|r to move button", 0.2, 1, 0.2)
+		GameTooltip:Show()
+	end)
+	
+	CursiveMinimapButton:SetScript("OnLeave", function(self)
+		GameTooltip:Hide()
+	end)
+	
+	UpdatePosition()
+	if Cursive.db.profile.showMinimapButton == false then
+		CursiveMinimapButton:Hide()
+	else
+		CursiveMinimapButton:Show()
+	end
+	Cursive.minimapButton = CursiveMinimapButton
 end
--- XXX end hack
+
+-- Initialize SavedVariables and AceConfig-3.0 options panel registration
+local frameInit = CreateFrame("Frame")
+frameInit:RegisterEvent("ADDON_LOADED")
+frameInit:SetScript("OnEvent", function(self, event, addonName)
+	if addonName == "Cursive" then
+		Cursive.db = LibStub("AceDB-3.0"):New("CursiveDB", Cursive.defaults, true)
+		
+		LibStub("AceConfig-3.0"):RegisterOptionsTable("Cursive", Cursive.cmdtable)
+		Cursive.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("Cursive", "Cursive")
+		
+		CreateMinimapButton()
+		self:UnregisterAllEvents()
+	end
+end)

@@ -1,28 +1,26 @@
-## Interface: 11200
-## Title: Cursive 3.1.1
-## Title-zhCN: Cursive 3.1.1
+## Interface: 30300
+## Title: Cursive
+## Title-zhCN: Cursive
 ## Author: Pepopo
 ## Notes: Uses GUIDs to show units in combat and track curses
 ## Notes-zhCN: 使用的GUID功能来显示战斗中的单位并监视诅咒等
 ## Version: 1.4.0
 ## SavedVariablesPerCharacter: CursiveDB
-## X-Embeds: Ace2, FuBarPlugin-2.0, CompostLib, DewDropLib, TabletLib
+## X-Embeds: Ace3
 
-Libs\AceLibrary\AceLibrary.lua
+libs\LibStub\LibStub.lua
+libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+libs\AceAddon-3.0\AceAddon-3.0.xml
+libs\AceEvent-3.0\AceEvent-3.0.xml
+libs\AceTimer-3.0\AceTimer-3.0.xml
+libs\AceDB-3.0\AceDB-3.0.xml
+libs\AceDBOptions-3.0\AceDBOptions-3.0.xml
+libs\AceLocale-3.0\AceLocale-3.0.xml
+libs\AceConsole-3.0\AceConsole-3.0.xml
+libs\AceGUI-3.0\AceGUI-3.0.xml
+libs\AceConfig-3.0\AceConfig-3.0.xml
 
-Libs\AceOO-2.0\AceOO-2.0.lua
-Libs\AceAddon-2.0\AceAddon-2.0.lua
-Libs\AceConsole\AceConsole-2.0.lua
-Libs\AceHook-2.1\AceHook-2.1.lua
-Libs\AceDB-2.0\AceDB-2.0.lua
-Libs\AceDebug\AceDebug-2.0.lua
-Libs\AceEvent-2.0\AceEvent-2.0.lua
-Libs\AceLocale-2.2\AceLocale-2.2.lua
-Libs\AceModuleCore-2.0\AceModuleCore-2.0.lua
-Libs\Dewdrop\Dewdrop-2.0.lua
-Libs\Tablet\Tablet-2.0.lua
-Libs\FuBarPlugin\FuBarPlugin-2.0.lua
-
+compat.lua
 Localization.lua
 global.lua
 utils.lua

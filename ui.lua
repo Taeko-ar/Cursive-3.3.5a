@@ -1,6 +1,4 @@
-if not Cursive.nampower then
-	return
-end
+-- Cursive UI setup for WotLK 3.3.5a
 
 local L = AceLibrary("AceLocale-2.2"):new("Cursive")
 
@@ -162,7 +160,10 @@ Cursive.UpdateFramesFromConfig = function()
 	end
 
 	-- after 3 seconds reset the unit frames so all changes are applied
-	Cursive:ScheduleEvent("resetUnitFrames", Cursive.ResetUnitFrames, 3)
+	if Cursive.resetTimer then
+		Cursive:CancelTimer(Cursive.resetTimer)
+	end
+	Cursive.resetTimer = Cursive:ScheduleTimer(Cursive.ResetUnitFrames, 3)
 end
 
 Cursive.ResetUnitFrames = function()
@@ -178,21 +179,68 @@ Cursive.ResetUnitFrames = function()
 	ui.unitFrames = {}
 end
 
+local secureButtons = {}
+Cursive.core.secureButtons = secureButtons
+
+local function CreateSecureButton(name, unitToken)
+	local btn = CreateFrame("Button", name, UIParent, "SecureActionButtonTemplate")
+	btn:SetAttribute("type", "target")
+	btn:SetAttribute("unit", unitToken)
+	btn:RegisterForClicks("AnyUp", "AnyDown")
+	
+	btn:SetScript("OnEnter", function(self)
+		local parent = self:GetParent()
+		if parent and parent:GetScript("OnEnter") then
+			parent:GetScript("OnEnter")(parent)
+		end
+	end)
+	btn:SetScript("OnLeave", function(self)
+		local parent = self:GetParent()
+		if parent and parent:GetScript("OnLeave") then
+			parent:GetScript("OnLeave")(parent)
+		end
+	end)
+	btn:Hide()
+	secureButtons[unitToken] = btn
+end
+
+Cursive.core:RegisterEvent("PLAYER_ENTERING_WORLD", function()
+	if not InCombatLockdown() then
+		if not next(secureButtons) then
+			CreateSecureButton("CursiveSecure_target", "target")
+			CreateSecureButton("CursiveSecure_focus", "focus")
+			for i = 1, 4 do
+				CreateSecureButton("CursiveSecure_party" .. i .. "target", "party" .. i .. "target")
+			end
+			for i = 1, 40 do
+				CreateSecureButton("CursiveSecure_raid" .. i .. "target", "raid" .. i .. "target")
+			end
+		end
+	end
+end)
+
 ui.BarEnter = function()
 	if this.parent.healthBar then
 		this.parent.healthBar.border:SetBackdropBorderColor(1, 1, 1, 1)
 	end
 	this.parent.hover = true
 
-  SetMouseoverUnit(this.parent.guid)
 	GameTooltip_SetDefaultAnchor(GameTooltip, this)
-	GameTooltip:SetUnit(this.parent.guid)
+	local token = Cursive.core:GetTokenForGUID(this.parent.guid)
+	if token then
+		GameTooltip:SetUnit(token)
+	else
+		local cached = Cursive.core.cache[this.parent.guid]
+		if cached and cached.name then
+			GameTooltip:ClearLines()
+			GameTooltip:AddLine(cached.name)
+		end
+	end
 	GameTooltip:Show()
 end
 
 ui.BarLeave = function()
 	this.parent.hover = false
-  SetMouseoverUnit()
 	GameTooltip:Hide()
 end
 
@@ -208,20 +256,41 @@ ui.BarUpdate = function()
 		this.tick = GetTime() + 0.05
 	end
 
+	local token = Cursive.core:GetTokenForGUID(this.guid)
+	local name = nil
+	local hp = nil
+	local hpMax = nil
+	local isTapped = false
+
+	if token then
+		name = UnitName(token)
+		hp = UnitHealth(token)
+		hpMax = UnitHealthMax(token)
+		isTapped = UnitIsTapped(token)
+	else
+		local cached = Cursive.core.cache[this.guid]
+		if cached then
+			name = cached.name
+			hpMax = cached.maxHp or 100
+			hp = hpMax
+			isTapped = cached.isTapped
+		end
+	end
+
 	-- update statusbar values if it exists
 	if this.healthBar then
-		this.healthBar:SetMinMaxValues(0, UnitHealthMax(this.guid))
-		this.healthBar:SetValue(UnitHealth(this.guid))
+		this.healthBar:SetMinMaxValues(0, hpMax or 100)
+		this.healthBar:SetValue(hp or 100)
 
 		-- update health bar color
-		local hex, r, g, b, a = utils.GetUnitColor(this.guid)
+		local hex, r, g, b, a = utils.GetUnitColor(token or this.guid)
 		this.healthBar:SetStatusBarColor(r, g, b, a)
 
 		-- update health bar border
 		if this.healthBar.border then
 			if this.hover then
 				this.healthBar.border:SetBackdropBorderColor(1, 1, 1, 1)
-			elseif UnitAffectingCombat(this.guid) then
+			elseif token and UnitAffectingCombat(token) then
 				this.healthBar.border:SetBackdropBorderColor(.8, .2, .2, 1)
 			else
 				this.healthBar.border:SetBackdropBorderColor(.2, .2, .2, 1)
@@ -230,23 +299,18 @@ ui.BarUpdate = function()
 	end
 
 	-- update caption text
-	local name = UnitName(this.guid)
 	if name and this.nameText then
 		this.nameText:SetText(name)
 	end
 
 	if this.hpText then
-		local hp = UnitHealth(this.guid)
 		if GetLocale() == "zhCN" then
 			if hp then
 				if hp >= 10000 then
 					hp = math.floor(hp / 1000) / 10 .. "万"
-					-- elseif hp >= 1000 then
-					-- 	hp = math.floor(hp / 100) / 10 .. "k"
 				end
 			end
 		else
-			-- convert hp to k if > 1000
 			if hp then
 				if hp >= 1000000 then
 					hp = math.floor(hp / 100000) / 10 .. "m"
@@ -263,8 +327,18 @@ ui.BarUpdate = function()
 
 	-- show raid icon if existing
 	if this.icon then
-		if GetRaidTargetIndex(this.guid) and Cursive.filter.alive(this.guid) then
-			SetRaidTargetIconTexture(this.icon, GetRaidTargetIndex(this.guid))
+		local raidIndex = nil
+		if token then
+			raidIndex = GetRaidTargetIndex(token)
+		else
+			local foundToken = Cursive.core:GetTokenForGUID(this.guid)
+			if foundToken then
+				raidIndex = GetRaidTargetIndex(foundToken)
+			end
+		end
+
+		if raidIndex and Cursive.filter.alive(this.guid) then
+			SetRaidTargetIconTexture(this.icon, raidIndex)
 			this.icon:Show()
 		else
 			this.icon:Hide()
@@ -273,7 +347,14 @@ ui.BarUpdate = function()
 
 	-- update target indicator
 	if this.target_left then
-		if UnitIsUnit("target", this.guid) then
+		local isTarget = false
+		if token then
+			isTarget = UnitIsUnit("target", token)
+		else
+			isTarget = (UnitGUID("target") == this.guid)
+		end
+
+		if isTarget then
 			this.target_left:Show()
 		else
 			this.target_left:Hide()
@@ -282,12 +363,15 @@ ui.BarUpdate = function()
 end
 
 ui.BarClick = function()
-	if arg1 == "LeftButton" then
-		TargetUnit(this.parent.guid)
-	elseif arg1 == "RightButton" then
-		TargetUnit(this.parent.guid)
-		if (not PlayerFrame.inCombat) then
-			AttackTarget()
+	if not InCombatLockdown() then
+		local token = Cursive.core:GetTokenForGUID(this.parent.guid)
+		if token then
+			TargetUnit(token)
+		else
+			local cached = Cursive.core.cache[this.parent.guid]
+			if cached and cached.name then
+				Cursive.utils.TargetByName(cached.name)
+			end
 		end
 	end
 end
@@ -577,19 +661,7 @@ local function DisplayGuid(guid)
 		unitFrame.pos = x .. y
 	end
 
-	-- check for shared debuffs
-	for sharedDebuffKey, guids in pairs(Cursive.curses.sharedDebuffGuids) do
-		if guids[guid] then
-			local sharedDebuffSpellIds = Cursive.curses.sharedDebuffs[sharedDebuffKey]
-			local spellId = hasAnySpellId(guid, sharedDebuffSpellIds)
-			if spellId ~= nil then
-				-- add curse to curses
-				Cursive.curses:ApplySharedCurse(sharedDebuffKey, spellId, guid, GetTime())
-				-- remove guid
-				Cursive.curses.sharedDebuffGuids[sharedDebuffKey][guid] = nil
-			end
-		end
-	end
+
 
 	-- update curses
 	local curseNumber = 1
@@ -611,7 +683,11 @@ local function DisplayGuid(guid)
 			local remaining = Cursive.curses:TimeRemaining(curseData)
 			local curse = unitFrame["curse" .. curseNumber]
 			if remaining >= 0 then
-        curse:SetTexture(Cursive.curses.trackedCurseIds[curseData.spellID].texture)
+        local texture = curseData.texture
+        if not texture and curseData.spellID then
+            _, _, texture = GetSpellInfo(curseData.spellID)
+        end
+        curse:SetTexture(texture or "Interface\\Icons\\INV_Misc_QuestionMark")
 
         if curseData["currentPlayer"] == false then
           curse:SetDesaturated(true); -- desaturate if not applied by current player
@@ -653,11 +729,15 @@ local function DisplayGuid(guid)
 end
 
 local function CheckForCleanup(guid, time)
-	local active = UnitExists(guid) and Cursive.filter.alive(guid)
-	if active then
-		local old = GetTime() - time >= 900 -- >= 15 minutes old
-		if old and not UnitIsVisible(guid) then
-			active = false
+	local token = Cursive.core:GetTokenForGUID(guid)
+	local active = false
+	if token then
+		active = UnitExists(token) and not UnitIsDead(token)
+	else
+		if not UnitAffectingCombat("player") then
+			active = Cursive.curses:HasAnyCurse(guid)
+		else
+			active = Cursive.curses:HasAnyCurse(guid) or (GetTime() - time < 15)
 		end
 	end
 
@@ -666,13 +746,6 @@ local function CheckForCleanup(guid, time)
 		Cursive.core.remove(guid)
 		-- remove from curses
 		Cursive.curses:RemoveGuid(guid)
-
-		-- remove from sharedDebuffGuids
-		for sharedDebuffKey, guids in pairs(Cursive.curses.sharedDebuffGuids) do
-			if guids[guid] then
-				Cursive.curses.sharedDebuffGuids[sharedDebuffKey][guid] = nil
-			end
-		end
 	end
 end
 
@@ -681,6 +754,9 @@ local displayedGuids = {};
 
 ui:SetAllPoints()
 ui:SetScript("OnUpdate", function()
+	if not Cursive.db or not Cursive.db.profile then
+		return
+	end
 	local config = Cursive.db.profile
 
 	if not config.enabled then
@@ -733,24 +809,32 @@ ui:SetScript("OnUpdate", function()
 
 	local averageMaxHp = 0
 
-	local _, currentTargetGuid = UnitExists("target")
+	local currentTargetGuid = UnitExists("target") and UnitGUID("target")
 
-	-- first consider raid marks
-	for i = 8, 1, -1 do
-		local _, guid = UnitExists("mark" .. i)
-		if guid then
-			if Cursive:ShouldDisplayGuid(guid) then
-				numDisplayable = numDisplayable + 1
-
-				-- display guid
-				displayedGuids[guid] = true
-				DisplayGuid(guid)
-				if ui.maxBarsDisplayed then
-					break
+	-- first consider raid marks (prioritizing 8 down to 1)
+	for markIndex = 8, 1, -1 do
+		for guid, _ in pairs(Cursive.core.guids) do
+			local token = Cursive.core:GetTokenForGUID(guid)
+			local rIndex = token and GetRaidTargetIndex(token)
+			if rIndex == markIndex then
+				if shouldDisplayGuids[guid] == nil then
+					shouldDisplayGuids[guid] = Cursive:ShouldDisplayGuid(guid)
 				end
+				if shouldDisplayGuids[guid] then
+					if not displayedGuids[guid] then
+						numDisplayable = numDisplayable + 1
+						displayedGuids[guid] = true
+						DisplayGuid(guid)
+						if ui.maxBarsDisplayed then
+							break
+						end
+					end
+				end
+				shouldDisplayGuids[guid] = false
 			end
-			-- don't try to display this guid again
-			shouldDisplayGuids[guid] = false
+		end
+		if ui.maxBarsDisplayed then
+			break
 		end
 	end
 
@@ -770,7 +854,15 @@ ui:SetScript("OnUpdate", function()
 
 		-- calculate top 3 max hps
 		if shouldDisplay then
-			local maxHp = UnitHealthMax(guid)
+			local maxHp = 0
+			local token = Cursive.core:GetTokenForGUID(guid)
+			if token then
+				maxHp = UnitHealthMax(token)
+			else
+				local cached = Cursive.core.cache[guid]
+				maxHp = cached and cached.maxHp or 0
+			end
+
 			if maxHp > topMaxHp then
 				thirdMaxHp = secondMaxHp
 				thirdMaxGuid = secondMaxGuid
@@ -793,21 +885,20 @@ ui:SetScript("OnUpdate", function()
 	end
 
 	-- top max hp
-	if not ui.maxBarsDisplayed and numDisplayable > ui.numDisplayed and not displayedGuids[topMaxGuid] then
+	if not ui.maxBarsDisplayed and numDisplayable > ui.numDisplayed and topMaxGuid and not displayedGuids[topMaxGuid] then
 		displayedGuids[topMaxGuid] = true
 		DisplayGuid(topMaxGuid)
 	end
 
 	-- second max hp
-	if not ui.maxBarsDisplayed and numDisplayable > ui.numDisplayed and not displayedGuids[secondMaxGuid] then
+	if not ui.maxBarsDisplayed and numDisplayable > ui.numDisplayed and secondMaxGuid and not displayedGuids[secondMaxGuid] then
 		displayedGuids[secondMaxGuid] = true
 		DisplayGuid(secondMaxGuid)
 	end
 
 	-- third max hp
-	if not ui.maxBarsDisplayed and numDisplayable > ui.numDisplayed and not displayedGuids[thirdMaxGuid] then
+	if not ui.maxBarsDisplayed and numDisplayable > ui.numDisplayed and thirdMaxGuid and not displayedGuids[thirdMaxGuid] then
 		displayedGuids[thirdMaxGuid] = true
-
 		DisplayGuid(thirdMaxGuid)
 	end
 
@@ -848,6 +939,33 @@ ui:SetScript("OnUpdate", function()
 		end
 	end
 
+	-- Clear secure button overlay position
+	if Cursive.core.secureButtons then
+		for _, btn in pairs(Cursive.core.secureButtons) do
+			btn:ClearAllPoints()
+			btn:SetPoint("BOTTOMLEFT", UIParent, "TOPRIGHT", 10000, 10000)
+			btn:Hide()
+		end
+
+		-- Position secure button overlays over active rows
+		for col, rows in pairs(ui.unitFrames) do
+			for row, unitFrame in pairs(rows) do
+				if unitFrame:IsShown() and unitFrame.guid then
+					local token = Cursive.core:GetTokenForGUID(unitFrame.guid)
+					if token then
+						local btn = Cursive.core.secureButtons[token]
+						if btn then
+							btn:SetParent(unitFrame.secondSection)
+							btn:SetAllPoints(unitFrame.secondSection)
+							btn:SetFrameStrata("HIGH")
+							btn:SetFrameLevel(unitFrame.secondSection:GetFrameLevel() + 10)
+							btn:Show()
+						end
+					end
+				end
+			end
+		end
+	end
 end)
 
 Cursive.ui = ui
